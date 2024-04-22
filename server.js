@@ -38,6 +38,7 @@ app.get('/download/:videoId',async (req, res) => {
   ytdl.downloadFromInfo(info, { format: format}).pipe(res)
 });
 
+
 app.get('/stream/:videoId', async (req, res) => {
   console.log(`Received request for video: ${req.params.videoId}`);
   try {
@@ -47,14 +48,9 @@ app.get('/stream/:videoId', async (req, res) => {
 
     const cachedAudio = cache[url];
     if (cachedAudio) {
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.send(cachedAudio);
+      handleRequestWithRange(cachedAudio, req, res);
     } else {
       const audioStream = ytdl.downloadFromInfo(info, { format: format });
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Accept-Ranges', 'bytes');//this is for letting user skip the  part of a song
-      audioStream.pipe(res);
-
       const audioBuffer = [];
       audioStream.on('data', (chunk) => {
         audioBuffer.push(chunk);
@@ -62,6 +58,7 @@ app.get('/stream/:videoId', async (req, res) => {
       audioStream.on('end', () => {
         const audioData = Buffer.concat(audioBuffer);
         cache[url] = audioData;
+        handleRequestWithRange(audioData, req, res);
       });
       audioStream.on('error', (err) => {
         console.error(err);
@@ -73,6 +70,79 @@ app.get('/stream/:videoId', async (req, res) => {
     res.status(500).json({ error: 'An error occurred while fetching video info' });
   }
 });
+
+function handleRequestWithRange(cachedAudio, req, res) {
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-");
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : cachedAudio.length - 1;
+    const chunk = cachedAudio.slice(start, end + 1);
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${cachedAudio.length}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunk.length,
+      'Content-Type': 'audio/mpeg',
+    });
+    res.end(chunk);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': cachedAudio.length,
+      'Content-Type': 'audio/mpeg',
+    });
+    res.end(cachedAudio);
+  }
+}
+``
+
+
+// app.get('/stream/:videoId', async (req, res) => {
+//   console.log(`Received request for video: ${req.params.videoId}`);
+//   try {
+//     const url = `http://www.youtube.com/watch?v=${req.params.videoId}`;
+//     const info = await ytdl.getInfo(url);
+//     const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+
+//     const cachedAudio = cache[url];
+//     if (cachedAudio) {
+//       res.setHeader('Content-Type', 'audio/mpeg');
+//       res.setHeader('Content-Length', cachedAudio.length); // Add Content-Length header
+//       res.status(206); // Set status code to 206 for partial content
+//       const range = req.headers.range;
+//       if (range) {
+//         const parts = range.replace(/bytes=/, "").split("-");
+//         const start = parseInt(parts[0], 10);
+//         const end = parts[1] ? parseInt(parts[1], 10) : cachedAudio.length - 1;
+//         const chunksize = (end - start) + 1;
+//         res.setHeader('Content-Range', `bytes ${start}-${end}/${cachedAudio.length}`);
+//         res.send(cachedAudio.slice(start, end + 1));
+//       } else {
+//         res.send(cachedAudio);
+//       }
+//     } else {
+//       const audioStream = ytdl.downloadFromInfo(info, { format: format });
+//       res.setHeader('Content-Type', 'audio/mpeg');
+//       res.setHeader('Accept-Ranges', 'bytes');
+//       audioStream.pipe(res);
+
+//       const audioBuffer = [];
+//       audioStream.on('data', (chunk) => {
+//         audioBuffer.push(chunk);
+//       });
+//       audioStream.on('end', () => {
+//         const audioData = Buffer.concat(audioBuffer);
+//         cache[url] = audioData;
+//       });
+//       audioStream.on('error', (err) => {
+//         console.error(err);
+//         res.status(500).json({ error: 'An error occurred while downloading the video' });
+//       });
+//     }
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: 'An error occurred while fetching video info' });
+//   }
+// });
 
 
 app.get('/api/suggestions', async(req, res)=>{
