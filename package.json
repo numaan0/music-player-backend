@@ -2,7 +2,7 @@
   "name": "music-app-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npx babel server.js -o dist/server.js"
