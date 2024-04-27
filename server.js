@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const axios = require('axios');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
@@ -148,17 +149,23 @@ app.get('/keep-alive', (req, res) => {
 
 const fetchKeepAlive = async () => {
   try {
-    const response = await fetch(`https://backend-music-app-v1.onrender.com/keep-alive`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch keep-alive endpoint');
+    const response = await axios.get('https://backend-music-app-v1.onrender.com/keep-alive',{
+      headers: {
+        'Content-Type': 'application/json', 
+      },
+    });
+    console.log(response)
+    if (response.status !== 200) {
+      throw new Error(`Failed to fetch keep-alive endpoint (HTTP ${response.status})`);
     }
-    const data = await response.json();
+    const data = response.data;
     console.log(data);
   } catch (error) {
-    console.error(error);
+    console.error(`Error fetching keep-alive endpoint: ${error.message}`);
     // Handle non-JSON responses or other errors here
   }
 };
+
 
 // Schedule the endpoint to be called every 5 minutes
 schedule.scheduleJob('*/2 * * * *', () => {
