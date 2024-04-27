@@ -141,22 +141,30 @@ app.get('/api/songs', async (req, res) => {
   }
 });
 
-async function callKeepAliveEndpoint(url) {
+app.get('/keep-alive', (req, res) => {
+  const randomNumber = Math.random();
+  res.json({ message: 'Server is alive!', randomNumber });
+});
+
+const fetchKeepAlive = async () => {
   try {
-    const response = await fetch(url);
+    const response = await fetch(`https://backend-music-app-v1.onrender.com/keep-alive`);
     if (!response.ok) {
-      throw new Error(`Failed to call keep-alive endpoint at ${url}`);
+      throw new Error('Failed to fetch keep-alive endpoint');
     }
     const data = await response.json();
     console.log(data);
   } catch (error) {
-    console.error('Error calling keep-alive endpoint:', error.message);
-    await callKeepAliveEndpoint('https://backend-music-app-v1.onrender.com/keep-alive'); // Replace with your actual URL
+    console.error(error);
+    // Handle non-JSON responses or other errors here
   }
-}
-callKeepAliveEndpoint('https://music-player-backend-production.up.railway.app/keep-alive');
+};
 
-schedule.scheduleJob('*/2 * * * *', callKeepAliveEndpoint.bind(null, 'https://music-player-backend-production.up.railway.app/keep-alive'));
+// Schedule the endpoint to be called every 5 minutes
+schedule.scheduleJob('*/2 * * * *', () => {
+  console.log('Calling keep-alive endpoint...');
+  fetchKeepAlive();
+});
 
 
 const port = process.env.PORT || 3000;
