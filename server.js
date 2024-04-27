@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const ytdl = require('ytdl-core');
 const ytSearch  = require('yt-search');
 const searchVideos = require('youtube-search-api');
+const schedule = require('node-schedule');
 const corsOptions = {
   origin: '*',  
   methods: ['GET', 'POST'],  
@@ -139,6 +140,24 @@ app.get('/api/songs', async (req, res) => {
       res.status(500).json({ error: 'An error occurred while fetching songs' });
   }
 });
+
+async function callKeepAliveEndpoint(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to call keep-alive endpoint at ${url}`);
+    }
+    const data = await response.json();
+    console.log(data);
+  } catch (error) {
+    console.error('Error calling keep-alive endpoint:', error.message);
+    await callKeepAliveEndpoint('https://backend-music-app-v1.onrender.com/keep-alive'); // Replace with your actual URL
+  }
+}
+callKeepAliveEndpoint('https://music-player-backend-production.up.railway.app/keep-alive');
+
+schedule.scheduleJob('*/2 * * * *', callKeepAliveEndpoint.bind(null, 'https://music-player-backend-production.up.railway.app/keep-alive'));
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
