@@ -42,33 +42,38 @@ app.get('/download/:videoId',async (req, res) => {
 
 app.get('/stream/:videoId', async (req, res) => {
   console.log(`Received request for video: ${req.params.videoId}`);
+
   try {
     const url = `http://www.youtube.com/watch?v=${req.params.videoId}`;
     const info = await ytdl.getInfo(url);
     const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
 
-    const cachedAudio = cache[url];
-    if (cachedAudio) {
+    const range = req.headers.range;
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : info.formats.find(f => f.itag === format.itag).contentLength - 1;
+
       res.setHeader('Content-Type', 'audio/mpeg');
-      res.send(cachedAudio);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${info.formats.find(f => f.itag === format.itag).contentLength}`);
+      res.setHeader('Content-Length', end - start + 1);
+      res.status(206);
+
+      const audioStream = ytdl.downloadFromInfo(info, {
+        format: format,
+        start: start,
+        end: end,
+      });
+
+      audioStream.pipe(res);
     } else {
-      const audioStream = ytdl.downloadFromInfo(info, { format: format });
-
       res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Transfer-Encoding', 'chunked');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Length', info.formats.find(f => f.itag === format.itag).contentLength);
 
-      audioStream.on('data', (chunk) => {
-        res.write(chunk);
-      });
-
-      audioStream.on('end', () => {
-        res.end();
-      });
-
-      audioStream.on('error', (err) => {
-        console.error(err);
-        res.status(500).json({ error: 'An error occurred while downloading the video' });
-      });
+      const audioStream = ytdl.downloadFromInfo(info, { format: format });
+      audioStream.pipe(res);
     }
   } catch (err) {
     console.error(err);
@@ -79,11 +84,9 @@ app.get('/stream/:videoId', async (req, res) => {
 
 
 
-
 app.get('/api/suggestions', async(req, res)=>{
 
   const {limit} = req.query;
-  console.log(limit);
   try{
     const result = await searchVideos.GetSuggestData(parseInt(limit));
     console.log("Result : ",result);
@@ -112,7 +115,6 @@ app.get('/api/songs', async (req, res) => {
 
   try {
       const result = await searchVideos.GetListByKeyword(keywords, false, parseInt(limit) );
-      console.log("List",result)
       const songs = result.items.map(item => ({
           title: item.title,
           videoId: item.id,
@@ -154,12 +156,10 @@ const fetchKeepAlive = async () => {
         'Content-Type': 'application/json', 
       },
     });
-    console.log(response)
     if (response.status !== 200) {
       throw new Error(`Failed to fetch keep-alive endpoint (HTTP ${response.status})`);
     }
     const data = response.data;
-    console.log(data);
   } catch (error) {
     console.error(`Error fetching keep-alive endpoint: ${error.message}`);
     // Handle non-JSON responses or other errors here
