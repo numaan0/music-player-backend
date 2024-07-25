@@ -5,7 +5,7 @@
 ToUseLater.js*
 # testing
 /coverage
-
+testytdl.js*
 # production
 /build
 /dist

@@ -1,14 +1,20 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const ytdl = require('ytdl-core');
+const ytdl = require("@distube/ytdl-core");
+const { exec } = require('child_process');
+const UserAgent = require('user-agents');
+const ytdlDiscord = require('ytdl-core-discord');
 const ytSearch  = require('yt-search');
 const searchVideos = require('youtube-search-api');
 const schedule = require('node-schedule');
+const request = require('request-promise');
+
 const corsOptions = {
   origin: '*',  
   methods: ['GET', 'POST'],  
@@ -86,20 +92,23 @@ app.get('/stream/:videoId', async (req, res) => {
 
 app.get('/api/suggestions', async(req, res)=>{
 
-  const {limit} = req.query;
+  const {video_id} = req.query;
   try{
-    const result = await searchVideos.GetSuggestData(parseInt(limit));
+    // const result = await searchVideos.GetSuggestData(parseInt(limit));
+    const url = `http://www.youtube.com/watch?v=${video_id}`;
+    const result = await ytdl.getBasicInfo(url);
+    console.log(result.related_videos);
     console.log("Result : ",result);
-    const songs = result.item.map(item =>({
+    const songs = result.related_videos.map(item =>({
       title: item.title,
       videoId: item.id,
-      thumbnail: item.thumbnail
+      thumbnail: ""
     }))
 
     res.json(songs);
 
   } catch(error){
-    console.log("Error",e);
+    console.log("Error",error);
     res.status(400).json({error: "Error Occured"});
   }
 

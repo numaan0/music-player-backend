@@ -1,4 +1,4 @@
-FROM node:14
+FROM node:20
 
 # Set the working directory in the Docker image
 WORKDIR /usr/src/app
